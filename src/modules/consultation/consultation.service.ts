@@ -11,29 +11,21 @@ import { User, UserDocument } from '../auth/schema/user.schema';
 
 @Injectable()
 export class ConsultationService {
-  private doctorId: string | null = null;
-
   constructor(
     @InjectModel(Consultation.name) private consultationModel: Model<ConsultationDocument>,
     @InjectModel(Appointment.name) private appointmentModel: Model<AppointmentDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>
-  ) {
-    this.initializeDoctor();
-  }
-  
+  ) {}
 
-  private async initializeDoctor() {
-    // Find the first user with doctor role
-    const doctor = await this.userModel.findOne({ role: 'doctor' }).exec();
-    if (!doctor) {
-      throw new Error('No doctor found in the system');
+  async create(createConsultationDto: CreateConsultationDto, doctorId: string): Promise<Consultation> {
+    if (!doctorId) {
+      throw new NotFoundException('Doctor ID is required');
     }
-    this.doctorId = doctor._id.toString();
-  }
 
-  async create(createConsultationDto: CreateConsultationDto): Promise<Consultation> {
-    if (!this.doctorId) {
-      throw new NotFoundException('Doctor not available');
+    // Verify doctor exists
+    const doctor = await this.userModel.findById(doctorId);
+    if (!doctor || doctor.role !== 'doctor') {
+      throw new NotFoundException('Doctor not found or invalid');
     }
 
     const { patientId, appointmentId: dtoAppointmentId } = createConsultationDto;
@@ -77,8 +69,8 @@ export class ConsultationService {
       ...createConsultationDto,
       appointmentId,
       patientId: appointment.patientId,
-      doctorId: this.doctorId, // Always use the single doctor
-      consultationDate:  new Date()
+      doctorId: doctorId, // Use the logged-in doctor's ID
+      consultationDate: new Date()
     });
 
     // Update appointment status to completed
@@ -89,7 +81,7 @@ export class ConsultationService {
 
   // ===== GET ALL CONSULTATIONS WITH FILTERING =====
 
-async findAll(queryDto: ConsultationQueryDto, patientId: string): Promise<any> {
+async findAll(queryDto: ConsultationQueryDto, patientId: string, doctorId?: string): Promise<any> {
     const { page = 1, limit = 10, startDate, endDate, search, sortOrder = 'desc' } = queryDto;
     
     // Validate date range
@@ -98,6 +90,11 @@ async findAll(queryDto: ConsultationQueryDto, patientId: string): Promise<any> {
     }
 
     const filter: any = { patientId };
+
+    // Add doctor filter if provided
+    if (doctorId) {
+        filter.doctorId = doctorId;
+    }
 
     // Date range filter
     if (startDate && endDate) {
@@ -156,18 +153,25 @@ async findAll(queryDto: ConsultationQueryDto, patientId: string): Promise<any> {
     }
 
     return this.consultationModel.findById(id)
-      .populate('patient', 'firstName lastName gender birthDate')
-      .populate('doctor', 'fullName email')
-      .populate('appointment', 'date time type status')
+      .populate('patientId', 'firstName lastName gender birthDate')
+      .populate('doctorId', 'fullName email')
+      .populate('appointmentId', 'date time type status')
       .exec();
   }
 
   // ===== GET CONSULTATIONS BY PATIENT =====
-  async findByPatient(patientId: string): Promise<Consultation[]> {
+  async findByPatient(patientId: string, doctorId?: string): Promise<Consultation[]> {
     const filter: any = { patientId };
+    
     if (!patientId) {
       throw new BadRequestException('Patient ID is required');
     }
+
+    // Add doctor filter if provided
+    if (doctorId) {
+        filter.doctorId = doctorId;
+    }
+
     return await this.consultationModel
       .find(filter)
       .populate('patientId', 'firstName lastName')
@@ -178,9 +182,15 @@ async findAll(queryDto: ConsultationQueryDto, patientId: string): Promise<any> {
 
  
   // ===== UPDATE CONSULTATION =====
-  async update(id: string, updateConsultationDto: UpdateConsultationDto): Promise<Consultation> {
+  async update(id: string, updateConsultationDto: UpdateConsultationDto, doctorId?: string): Promise<Consultation> {
+    const filter: any = { _id: id };
+    
     // Ensure doctor can only update their own consultations
-    const consultation = await this.consultationModel.findOne({ _id: id });
+    if (doctorId) {
+        filter.doctorId = doctorId;
+    }
+
+    const consultation = await this.consultationModel.findOne(filter);
     if (!consultation) {
       throw new NotFoundException('Consultation not found or you do not have permission to update it');
     }
@@ -196,12 +206,19 @@ async findAll(queryDto: ConsultationQueryDto, patientId: string): Promise<any> {
   }
 
   // ===== DELETE CONSULTATION =====
-async remove(id: string): Promise<void> {
+async remove(id: string, doctorId?: string): Promise<void> {
     if (!isValidObjectId(id)) {
         throw new BadRequestException('Invalid consultation ID');
     }
 
-    const consultation = await this.consultationModel.findById(id);
+    const filter: any = { _id: id };
+    
+    // Ensure doctor can only delete their own consultations
+    if (doctorId) {
+        filter.doctorId = doctorId;
+    }
+
+    const consultation = await this.consultationModel.findOne(filter);
     if (!consultation) {
         throw new NotFoundException('Consultation not found or you do not have permission to delete it');
     }
@@ -275,8 +292,8 @@ async remove(id: string): Promise<void> {
 
     return await this.consultationModel
       .find(filter)
-      .populate('patient', 'firstName lastName')
-      .populate('doctor', 'fullName')
+      .populate('patientId', 'firstName lastName')
+      .populate('doctorId', 'fullName')
       .sort({ consultationDate: -1 })
       .limit(50)
       .exec();

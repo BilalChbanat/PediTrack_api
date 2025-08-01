@@ -4,8 +4,11 @@ import { MongooseModule } from "@nestjs/mongoose";
 import { Consultation, ConsultationSchema } from "./schemas/consultation.schema";
 import { ConsultationController } from "./consultation.controller";
 import { ConsultationService } from "./consultation.service";
+import { DoctorFinderService } from "./find-doctor";
 import { use } from "passport";
 import { AuthModule } from "../auth/auth.module";
+import { User, UserSchema } from "../auth/schema/user.schema";
+import { Appointment, AppointmentSchema } from "../appointment/appointment.schema";
 
 @Module({
   imports: [
@@ -14,13 +17,16 @@ import { AuthModule } from "../auth/auth.module";
 
     MongooseModule.forFeature([
       { name: Consultation.name, schema: ConsultationSchema },
+      { name: User.name, schema: UserSchema },
+      { name: Appointment.name, schema: AppointmentSchema },
     ]),
   ],
   controllers: [
     ConsultationController
   ],
   providers: [
-    ConsultationService
+    ConsultationService,
+    DoctorFinderService
   ],
 })
 export class ConsultationModule {}
