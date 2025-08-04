@@ -1,4 +1,5 @@
-import { IsDateString, IsNotEmpty, IsMongoId, Matches } from 'class-validator';
+import { IsDateString, IsNotEmpty, IsMongoId, Matches, IsEnum, IsOptional, IsString } from 'class-validator';
+import { appointmentStatusEnum, AppointmentStatus } from '../appointment.schema';
 
 export class CreateAppointmentDto {
   @IsMongoId({ message: 'Invalid patient ID' })
@@ -16,8 +17,14 @@ export class CreateAppointmentDto {
   })
   time: string; // e.g., '14:30'
 
-  status?: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  @IsOptional()
+  @IsEnum(appointmentStatusEnum, { 
+    message: `Status must be one of: ${appointmentStatusEnum.join(', ')}` 
+  })
+  status?: AppointmentStatus;
 
+  @IsOptional()
+  @IsString()
   notes?: string;
 
   @IsNotEmpty({ message: 'Type is required' })

@@ -9,6 +9,18 @@ import { Document, Types } from 'mongoose';
 
 export type AppointmentDocument = Appointment & Document;
 
+// Define the appointment status enum
+export const appointmentStatusEnum = [
+  'pending',
+  'confirmed', 
+  'in-consultation',
+  'completed',
+  'cancelled',
+  'no-show'
+] as const;
+
+export type AppointmentStatus = typeof appointmentStatusEnum[number];
+
 @Schema({ timestamps: true })
 export class Appointment {
   @Prop({ 
@@ -35,10 +47,10 @@ export class Appointment {
   notes: string;
 
   @Prop({
-    enum: ['confirmed', 'cancelled', 'completed', 'pending'],
+    enum: appointmentStatusEnum,
     default: 'pending',
   })
-  status: string;
+  status: AppointmentStatus;
 }
 
 export const AppointmentSchema = SchemaFactory.createForClass(Appointment);

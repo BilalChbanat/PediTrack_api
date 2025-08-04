@@ -9,6 +9,8 @@ import {
   Query,
   Put,
   //   UseGuards,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { AppointmentService } from './appointment.service';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
@@ -56,8 +58,27 @@ export class AppointmentController {
   @Put(':id')
   //   @Roles('doctor')
   @ApiOperation({ summary: 'Update an appointment' })
-  async update(@Param('id') id: string, @Body() dto:any) {
-    return this.appointmentService.update(id, dto);
+  @ApiResponse({ status: 200, description: 'Appointment updated successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request - invalid data' })
+  @ApiResponse({ status: 404, description: 'Appointment not found' })
+  async update(@Param('id') id: string, @Body() dto: UpdateAppointmentDto) {
+    try {
+      return await this.appointmentService.update(id, dto);
+    } catch (error) {
+      // Log the error for debugging
+      console.error('Error in appointment update endpoint:', error);
+      
+      // Re-throw the error if it's already an HttpException
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      
+      // Handle unexpected errors
+      throw new HttpException(
+        'Internal server error while updating appointment',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
   }
 
   @Delete(':id')

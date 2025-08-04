@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Appointment } from './appointment.schema';
+import { Appointment, appointmentStatusEnum, AppointmentStatus } from './appointment.schema';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 import * as moment from 'moment';
@@ -75,11 +75,39 @@ async create(dto: CreateAppointmentDto) {
 
   // UPDATE appointment (notes, status, etc.)
   async update(id: string, dto: UpdateAppointmentDto) {
-    const appointment = await this.appointmentModel.findById(id);
-    if (!appointment) throw new NotFoundException('Appointment not found');
+    try {
+      const appointment = await this.appointmentModel.findById(id);
+      if (!appointment) {
+        throw new NotFoundException('Appointment not found');
+      }
 
-    Object.assign(appointment, dto);
-    return appointment.save();
+      // Validate status if provided
+      if (dto.status && !appointmentStatusEnum.includes(dto.status as AppointmentStatus)) {
+        throw new BadRequestException(
+          `Invalid status. Must be one of: ${appointmentStatusEnum.join(', ')}`
+        );
+      }
+
+      // Update the appointment
+      Object.assign(appointment, dto);
+      const updatedAppointment = await appointment.save();
+      
+      return updatedAppointment;
+    } catch (error) {
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+        throw error;
+      }
+      
+      // Handle MongoDB validation errors
+      if (error.name === 'ValidationError') {
+        const validationErrors = Object.values(error.errors).map((err: any) => err.message);
+        throw new BadRequestException(`Validation failed: ${validationErrors.join(', ')}`);
+      }
+      
+      // Handle other errors
+      console.error('Error updating appointment:', error);
+      throw new BadRequestException('Failed to update appointment. Please try again.');
+    }
   }
 
   // CANCEL appointment
