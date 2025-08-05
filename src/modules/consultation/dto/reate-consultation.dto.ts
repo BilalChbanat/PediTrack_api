@@ -38,4 +38,12 @@ export class CreateConsultationDto {
   @IsOptional()
   isPaid?: boolean;
 
+  // Additional fields that frontend might send
+  @IsMongoId()
+  @IsOptional()
+  doctorId?: string; // Will be ignored for security
+
+  @IsDateString()
+  @IsOptional()
+  consultationDate?: string; // Will be set by backend
 }

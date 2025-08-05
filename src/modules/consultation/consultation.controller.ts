@@ -63,6 +63,35 @@ export class ConsultationController {
     return await this.consultationService.create(consultationData, finalDoctorId);
   }
 
+  // ===== CREATE OR UPDATE CONSULTATION =====
+  @Post('create-or-update')
+  @UsePipes(new ValidationPipe({ whitelist: true }))
+  async createOrUpdate(
+    @Body() createConsultationDto: CreateConsultationDto,
+    @Request() req: any
+  ) {
+    let doctorId = req.user?.id;
+    
+    // If no authenticated user, find or create a default doctor
+    if (!doctorId) {
+      doctorId = await this.doctorFinderService.createDefaultDoctorIfNotExists();
+    }
+    
+    // Remove doctorId and consultationDate from payload if they exist (for security)
+    const { doctorId: payloadDoctorId, consultationDate: payloadConsultationDate, ...cleanPayload } = createConsultationDto as any;
+    
+    // Check if consultation already exists for this appointment
+    const existingConsultation = await this.consultationService.findByAppointment(cleanPayload.appointmentId);
+    
+    if (existingConsultation) {
+      // Update existing consultation
+      return await this.consultationService.update(existingConsultation._id.toString(), cleanPayload, doctorId);
+    } else {
+      // Create new consultation
+      return await this.consultationService.create(cleanPayload, doctorId);
+    }
+  }
+
   // ===== CREATE CONSULTATION (TEMP - FOR TESTING) =====
   @Post('temp')
   @UsePipes(new ValidationPipe({ whitelist: true }))
@@ -85,12 +114,27 @@ export class ConsultationController {
     @Request() req: any
   ) {
     // Extract doctorId from session, ignore if sent in payload
-    const doctorId = req.user?.id;
+    let doctorId = req.user?.id;
     
-    // Remove doctorId from payload if it exists (for security)
-    const { doctorId: payloadDoctorId, ...cleanPayload } = createConsultationDto as any;
+    // If no authenticated user, find or create a default doctor
+    if (!doctorId) {
+      doctorId = await this.doctorFinderService.createDefaultDoctorIfNotExists();
+    }
+    
+    // Remove doctorId and consultationDate from payload if they exist (for security)
+    const { doctorId: payloadDoctorId, consultationDate: payloadConsultationDate, ...cleanPayload } = createConsultationDto as any;
     
     return await this.consultationService.create(cleanPayload, doctorId);
+  }
+
+  // ===== GET ALL CONSULTATIONS =====
+  @Get()
+  async getAllConsultations(@Request() req: any) {
+    const doctorId = req.user?.id;
+    // If no authenticated user, don't filter by doctor
+    const filter = doctorId ? { doctorId } : {};
+    
+    return await this.consultationService.findAllConsultations(filter);
   }
 
   // ===== GET CONSULTATION STATISTICS =====
@@ -131,6 +175,42 @@ export class ConsultationController {
     console.log('Finding consultations for patient:', patientId);           
     const doctorId = req.user?.id;
     return await this.consultationService.findByPatient(patientId, doctorId);
+  }
+
+  // ===== GET ALL CONSULTATIONS BY PATIENT ID (ENHANCED) =====
+  @Get('by-patient/:patientId')
+  async getAllConsultationsByPatient(
+    @Param('patientId') patientId: string,
+    @Request() req: any
+  ) {
+    console.log('Getting all consultations for patient:', patientId);
+    const doctorId = req.user?.id;
+    
+    // Get consultations with full population
+    const consultations = await this.consultationService.findAllConsultationsByPatient(patientId, doctorId);
+    
+    return {
+      patientId,
+      totalConsultations: consultations.length,
+      consultations
+    };
+  }
+
+  // ===== GET ALL CONSULTATIONS BY PATIENT ID (NO AUTH) =====
+  @Get('patient-all/:patientId')
+  async getAllConsultationsByPatientNoAuth(
+    @Param('patientId') patientId: string
+  ) {
+    console.log('Getting all consultations for patient (no auth):', patientId);
+    
+    // Get all consultations for patient without doctor filter
+    const consultations = await this.consultationService.findAllConsultationsByPatient(patientId);
+    
+    return {
+      patientId,
+      totalConsultations: consultations.length,
+      consultations
+    };
   }
 
   // ===== GET SINGLE CONSULTATION =====

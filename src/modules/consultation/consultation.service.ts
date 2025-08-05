@@ -35,6 +35,11 @@ export class ConsultationService {
     if (appointmentId) {
       appointment = await this.appointmentModel.findById(appointmentId);
       if (!appointment) throw new NotFoundException('Appointment not found');
+      
+      // Validate that the appointment belongs to the specified patient
+      if (appointment.patientId.toString() !== patientId) {
+        throw new BadRequestException('Appointment does not belong to the specified patient');
+      }
     } else {
       // Find today's latest confirmed appointment for patient
       const today = new Date();
@@ -58,17 +63,17 @@ export class ConsultationService {
       appointmentId = appointment._id.toString();
     }
 
-    // Check if consultation already exists for this appointment
-    const existingConsultation = await this.consultationModel.findOne({ appointmentId });
-    if (existingConsultation) {
-      throw new BadRequestException('Consultation already exists for this appointment');
-    }
+    // Check if consultation already exists for this appointment (optional - can be disabled)
+    // const existingConsultation = await this.consultationModel.findOne({ appointmentId });
+    // if (existingConsultation) {
+    //   throw new BadRequestException('Consultation already exists for this appointment');
+    // }
 
     // Create consultation
     const consultation = new this.consultationModel({
       ...createConsultationDto,
       appointmentId,
-      patientId: appointment.patientId,
+      patientId: patientId, // Use the patientId from the DTO, not from appointment
       doctorId: doctorId, // Use the logged-in doctor's ID
       consultationDate: new Date()
     });
@@ -79,9 +84,19 @@ export class ConsultationService {
     return consultation.save();
   }
 
-  // ===== GET ALL CONSULTATIONS WITH FILTERING =====
+  // ===== GET ALL CONSULTATIONS =====
+  async findAllConsultations(filter: any = {}): Promise<Consultation[]> {
+    return await this.consultationModel
+      .find(filter)
+      .populate('patientId', 'firstName lastName gender birthDate')
+      .populate('doctorId', 'fullName email')
+      .populate('appointmentId', 'date time type status')
+      .sort({ consultationDate: -1 })
+      .exec();
+  }
 
-async findAll(queryDto: ConsultationQueryDto, patientId: string, doctorId?: string): Promise<any> {
+  // ===== GET ALL CONSULTATIONS WITH FILTERING =====
+  async findAll(queryDto: ConsultationQueryDto, patientId: string, doctorId?: string): Promise<any> {
     const { page = 1, limit = 10, startDate, endDate, search, sortOrder = 'desc' } = queryDto;
     
     // Validate date range
@@ -177,6 +192,38 @@ async findAll(queryDto: ConsultationQueryDto, patientId: string, doctorId?: stri
       .populate('patientId', 'firstName lastName')
       .populate('appointmentId', 'date time type')
       .sort({ consultationDate: -1 })
+      .exec();
+  }
+
+  // ===== GET ALL CONSULTATIONS BY PATIENT (ENHANCED) =====
+  async findAllConsultationsByPatient(patientId: string, doctorId?: string): Promise<Consultation[]> {
+    if (!patientId) {
+      throw new BadRequestException('Patient ID is required');
+    }
+
+    const filter: any = { patientId };
+    
+    // Add doctor filter if provided
+    if (doctorId) {
+        filter.doctorId = doctorId;
+    }
+
+    return await this.consultationModel
+      .find(filter)
+      .populate('patientId', 'firstName lastName gender birthDate')
+      .populate('doctorId', 'fullName email')
+      .populate('appointmentId', 'date time type status')
+      .sort({ consultationDate: -1 })
+      .exec();
+  }
+
+  // ===== FIND CONSULTATION BY APPOINTMENT =====
+  async findByAppointment(appointmentId: string) {
+    return await this.consultationModel
+      .findOne({ appointmentId })
+      .populate('patientId', 'firstName lastName gender birthDate')
+      .populate('doctorId', 'fullName email')
+      .populate('appointmentId', 'date time type status')
       .exec();
   }
 
