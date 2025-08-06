@@ -15,7 +15,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { User, UserDocument } from '../schema/user.schema';
 import { EmailVerificationService } from 'src/utils';
 import { MailService } from './mailService.service';
-import { LoginDto, RegisterDto } from '../dto/auth.dto';
+import { LoginDto, LoginParentDto, RegisterDto, RegisterParentDto } from '../dto/auth.dto';
 import { ConfigService } from '@nestjs/config';
 import { AuthResponse } from '../../../common/interfaces/authResponse';
 import { Response } from 'express';
@@ -40,7 +40,7 @@ export class AuthService {
 
   private async generateTokens(payload: {
     sub: string;
-    email: string;
+    email?: string;
     role: string;
   }) {
     const accessToken = await this.jwtService.signAsync(payload, {
@@ -112,7 +112,7 @@ export class AuthService {
 
       const tokens = await this.generateTokens({
         sub: user._id.toString(),
-        email: user.email,
+        email: user.email || undefined,
         role: user.role, // Assurez-vous que user.role est correctement récupéré
       });
 
@@ -125,7 +125,7 @@ export class AuthService {
           user: {
             id: user._id.toString(),
             fullName: user.fullName,
-            email: user.email,
+            email: user.email || null,
             role: user.role,
           },
           accessToken: tokens.accessToken,
@@ -134,6 +134,44 @@ export class AuthService {
     } catch (error) {
       this.logger.error(
         `Login failed for ${credentials.email}: ${error.message}`,
+        error.stack,
+      );
+      throw this.handleLoginError(error);
+    }
+  }
+
+  async loginParent(
+    credentials: LoginParentDto,
+    response: Response,
+  ): Promise<AuthResponse> {
+    try {
+      const user = await this.validateParent(credentials);
+
+      const tokens = await this.generateTokens({
+        sub: user._id.toString(),
+        email: user.email || undefined,
+        role: user.role,
+      });
+
+      this.setAuthCookies(response, tokens);
+
+      return {
+        status: HttpStatus.OK,
+        data: {
+          message: 'Parent login successful',
+          user: {
+            id: user._id.toString(),
+            fullName: user.fullName,
+            email: user.email || null,
+            phoneNumber: user.phoneNumber,
+            role: user.role,
+          },
+          accessToken: tokens.accessToken,
+        },
+      };
+    } catch (error) {
+      this.logger.error(
+        `Parent login failed: ${error.message}`,
         error.stack,
       );
       throw this.handleLoginError(error);
@@ -157,7 +195,7 @@ export class AuthService {
 
       const tokens = await this.generateTokens({
         sub: user._id.toString(),
-        email: user.email,
+        email: user.email || undefined,
         role: user.role,
       });
 
@@ -184,6 +222,20 @@ export class AuthService {
       this.logger.error(`Registration error: ${error.message}`, error.stack);
       throw new HttpException(
         error.message || 'Registration failed',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  async registerParent(body: RegisterParentDto): Promise<any> {
+    try {
+      const registrationResult = await this.registerAndVerifyParent(body);
+
+      return registrationResult;
+    } catch (error) {
+      this.logger.error(`Parent registration error: ${error.message}`, error.stack);
+      throw new HttpException(
+        error.message || 'Parent registration failed',
         error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -217,7 +269,7 @@ export class AuthService {
 
   private async generateAccessToken(payload: {
     id: string;
-    email: string;
+    email?: string;
     role: string;
   }): Promise<string> {
     return this.jwtService.signAsync(payload, {
@@ -228,7 +280,7 @@ export class AuthService {
 
   private async generateRefreshToken(payload: {
     id: string;
-    email: string;
+    email?: string;
   }): Promise<string> {
     return this.jwtService.signAsync(payload, {
       secret: this.configService.get<string>('jwt.secret'),
@@ -283,6 +335,27 @@ export class AuthService {
     };
   }
 
+  async registerAndVerifyParent(userData: RegisterParentDto): Promise<any> {
+    const registered = await this.userService.registerParent(userData);
+
+    if (!registered.success) {
+      throw new HttpException(registered.error, HttpStatus.BAD_REQUEST);
+    }
+    if (!registered.user?._id) {
+      throw new InternalServerErrorException(
+        'Invalid user data after registration',
+      );
+    }
+
+    return {
+      status: HttpStatus.CREATED,
+      data: {
+        userId: registered.user?.id,
+        message: 'Parent created successfully',
+      },
+    };
+  }
+
   async verifyEmail(
     token: string,
   ): Promise<{ message: string; statusCode: number }> {
@@ -308,6 +381,31 @@ export class AuthService {
       );
     }
     await this.checkEmailVerification(user);
+    return user;
+  }
+
+  private async validateParent(credentials: LoginParentDto): Promise<UserDocument> {
+    let user: UserDocument | null = null;
+    
+    if (credentials.email) {
+      user = await this.userService.findByEmail(credentials.email);
+    } else if (credentials.phoneNumber) {
+      user = await this.userModel.findOne({ 
+        phoneNumber: credentials.phoneNumber,
+        role: 'parent'
+      });
+    } else {
+      throw new UnauthorizedException('Email or phone number is required');
+    }
+
+    if (!user || !(await user.comparePassword(credentials.password))) {
+      throw new UnauthorizedException('Invalid credentials');
+    } else if (user.isVerified === false) {
+      throw new UnauthorizedException(
+        'Account not verified - Please verify your account',
+      );
+    }
+    
     return user;
   }
 

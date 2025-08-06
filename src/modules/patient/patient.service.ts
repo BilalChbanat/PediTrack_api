@@ -49,10 +49,10 @@ export class PatientService {
       let parentId = createPatientDto.parentId;
 
       // If parentId is not provided, create a new parent
-      if (!parentId && (createPatientDto.fullName || createPatientDto.email || createPatientDto.phoneNumber)) {
+      if (!parentId && (createPatientDto.fullName || createPatientDto.phoneNumber)) {
         const parent = await this.userModel.create({
           fullName: createPatientDto.fullName,
-          email: createPatientDto.email,
+          email: createPatientDto.email || undefined,
           phoneNumber: createPatientDto.phoneNumber,
           role: 'parent',
           isVerified: true,
@@ -93,13 +93,16 @@ export class PatientService {
     try {
 
       const insurance = createPatientDto.insurance;
-      const existingParent = await this.userModel.findOne({
-        email: createPatientDto.email,
-        role: 'parent',
-      });
+      // Only check for existing parent if email is provided
+      if (createPatientDto.email) {
+        const existingParent = await this.userModel.findOne({
+          email: createPatientDto.email,
+          role: 'parent',
+        });
 
-      if (existingParent) {
-        throw new ConflictException('Parent with this email already exists');
+        if (existingParent) {
+          throw new ConflictException('Parent with this email already exists');
+        }
       }
 
       const parent = new this.userModel({

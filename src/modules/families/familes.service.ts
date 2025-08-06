@@ -136,7 +136,7 @@ export class FamiliesService {
                 _id: parent._id.toString(),
                 fullName: parent.fullName,
                 phoneNumber: parent.phoneNumber,
-                email: parent.email
+                email: parent.email || null
             }));
         } catch {
             throw new BadRequestException('Failed to fetch available parents');
@@ -201,7 +201,7 @@ export class FamiliesService {
             _id: parent._id.toString(),
             fullName: parent.fullName,
             phoneNumber: parent.phoneNumber,
-            email: parent.email,
+            email: parent.email || null,
         } : null,
         childrenDetails: children.map(child => ({
             _id: child._id.toString(),

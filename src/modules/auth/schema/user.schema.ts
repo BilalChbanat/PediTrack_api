@@ -13,8 +13,8 @@ export class User {
   @Prop({ required: [true, 'Full name is required'] })
   fullName: string;
 
-  @Prop({ required: [true, 'Email is required'], unique: true })
-  email: string;
+  @Prop({ required: false, unique: true, sparse: true })
+  email?: string;
 
   @Prop({
     required: [false, 'Password is required'],

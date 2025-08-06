@@ -8,7 +8,7 @@ export class FamilyResponseDto {
         _id: string;
         fullName: string;
         phoneNumber: string;
-        email: string;
+        email?: string;
     };
     readonly childrenDetails?: Array<{
         _id: string;

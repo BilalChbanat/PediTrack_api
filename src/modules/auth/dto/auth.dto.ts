@@ -1,5 +1,5 @@
 import { IsEmail, IsString, MinLength, IsNotEmpty, IsNumber, IsOptional, IsBoolean } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class RegisterDto {
   @ApiProperty({
@@ -79,6 +79,32 @@ export class LoginDto {
   password: string;
 }
 
+export class LoginParentDto {
+  @ApiPropertyOptional({
+    example: 'john@example.com',
+    description: 'The email address of the parent (optional if phone number provided)',
+  })
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @ApiPropertyOptional({
+    example: '+1234567890',
+    description: 'The phone number of the parent (optional if email provided)',
+  })
+  @IsOptional()
+  @IsString()
+  phoneNumber?: string;
+
+  @ApiProperty({
+    example: 'password123',
+    description: 'The password for the account',
+  })
+  @IsString()
+  @IsNotEmpty()
+  password: string;
+}
+
 export class ForgotPasswordDto {
   @ApiProperty({
     example: 'john@example.com',
@@ -148,4 +174,64 @@ export class RegisterRestaurantDto extends RegisterDto {
   @IsBoolean()
   @IsOptional()
   isDeliveryAvailable?: boolean;
+}
+
+export class RegisterParentDto {
+  @ApiPropertyOptional({
+    example: 'john@example.com',
+    description: 'The email address of the parent (optional)',
+  })
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @ApiProperty({
+    example: 'password123',
+    description: 'The password for the account',
+  })
+  @IsString()
+  @MinLength(8)
+  @IsNotEmpty() // Password should not be optional for registration
+  password: string;
+
+  @ApiProperty({
+    example: 'John Doe',
+    description: 'The full name of the parent',
+  })
+  @IsString()
+  @IsNotEmpty()
+  fullName: string;
+
+  @ApiProperty({
+    example: '+1234567890',
+    description: 'The phone number of the parent'
+  })
+  @IsString()
+  @IsNotEmpty()
+  phoneNumber: string;
+
+  @ApiProperty({
+    example: '123 Main St, City, Country',
+    description: 'The address of the parent'
+  })
+  @IsString()
+  @IsOptional()
+  address?: string;
+
+  @ApiProperty({
+    example: 'Health Insurance',
+    description: 'Insurance information'
+  })
+  @IsString()
+  @IsOptional()
+  insurance?: string;
+   
+  @ApiProperty({
+    example: true,
+    description: 'Indicates if the user is verified',
+    default: true,
+  })
+  @IsBoolean()
+  @IsOptional()
+  isVerified?: boolean = true;
 }

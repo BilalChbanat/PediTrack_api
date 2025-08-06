@@ -46,6 +46,39 @@ export class UserService {
     }
   }
 
+  async registerParent(
+    userData: any,
+  ): Promise<{ success: boolean; user?: UserDocument; error?: string }> {
+    try {
+      // Only check for existing email if email is provided
+      if (userData.email) {
+        const emailExists = await this.userModel.findOne({
+          email: userData.email,
+        });
+        if (emailExists) {
+          return { success: false, error: 'Email already exists' };
+        }
+      }
+
+      const user = await this.userModel.create({
+        ...pick(userData, [
+          'fullName',
+          'email',
+          'password',
+          'phoneNumber',
+          'address',
+          'insurance',
+        ]),
+        isVerified: true,
+        role: 'parent',
+      });
+
+      return { success: true, user };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
   async findByIdAndUpdate(
     id: string,
     updateData: any,

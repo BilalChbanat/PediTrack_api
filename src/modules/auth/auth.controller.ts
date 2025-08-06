@@ -20,7 +20,9 @@ import {
 import { AuthService } from './services/auth.service';
 import {
   LoginDto,
+  LoginParentDto,
   RegisterDto,
+  RegisterParentDto,
   ResetPasswordDto,
   ForgotPasswordDto,
 } from './dto/auth.dto';
@@ -68,6 +70,25 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ): Promise<AuthResponse> {
     return this.authService.login(loginDto, response);
+  }
+
+  @Post('login/parent')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Parent login (email or phone number)' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    description: 'Parent login successful',
+  })
+  @ApiResponse({
+    status: HttpStatus.UNAUTHORIZED,
+    description: 'Invalid credentials',
+  })
+  @ApiBody({ type: LoginParentDto })
+  async loginParent(
+    @Body(new ValidationPipe()) loginParentDto: LoginParentDto,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<AuthResponse> {
+    return this.authService.loginParent(loginParentDto, response);
   }
 
   @Post('refresh-token')
@@ -124,6 +145,23 @@ export class AuthController {
     @Body(new ValidationPipe()) registerDto: RegisterDto,
   ): Promise<AuthResponse> {
     return this.authService.registerClient(registerDto);
+  }
+
+  @Post('register/parent')
+  @ApiOperation({ summary: 'Register a new parent (email optional)' })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    description: 'Parent successfully registered',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid input data',
+  })
+  @ApiBody({ type: RegisterParentDto })
+  async registerParent(
+    @Body(new ValidationPipe()) registerParentDto: RegisterParentDto,
+  ): Promise<AuthResponse> {
+    return this.authService.registerParent(registerParentDto);
   }
 
   @Get('verify-email')

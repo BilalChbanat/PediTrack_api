@@ -122,17 +122,17 @@ export class  CreatePatientDto {
   @Transform(({ value }) => value?.trim())
   fullName: string;
 
-  @ApiProperty({
-    description: 'Email address',
+  @ApiPropertyOptional({
+    description: 'Email address (optional)',
     example: 'ahmed.benali@email.com',
   })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @Transform(({ value }) => value?.trim().toLowerCase())
   @Matches(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, {
     message: 'Please enter a valid email address',
   })
-  email: string;
+  email?: string;
 
   @IsEnum(['parent'], {
     message: 'Role must be parent',

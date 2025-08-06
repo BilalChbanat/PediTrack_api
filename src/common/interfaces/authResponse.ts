@@ -7,8 +7,9 @@ export interface AuthResponse {
     message?: string;
     user?: {
       id: string;
-      email: string;
+      email?: string;
       fullName: string;
+      phoneNumber?: string;
       role: string;
     };
     userId?: string; // Corrected line
