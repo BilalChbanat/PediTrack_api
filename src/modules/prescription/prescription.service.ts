@@ -16,7 +16,7 @@ export class PrescriptionService {
   }
 
   async findByPatient(patientId: string): Promise<Prescription[]> {
-    return this.prescriptionModel.find({ patientId }).sort({ startDate: -1 }).exec();
+    return this.prescriptionModel.find({ patientId }).sort({ createdAt: -1 }).exec();
   }
 
   async update(id: string, dto: UpdatePrescriptionDto): Promise<Prescription> {
